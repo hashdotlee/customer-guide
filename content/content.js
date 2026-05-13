@@ -73,8 +73,33 @@
       const n = qs(el, s);
       if (n?.textContent?.trim().length > 5) return n.textContent.trim();
     }
-    // Biggest span[dir=auto]
-    const spans = qsa(el, 'span[dir="auto"]').filter(s => s.textContent.trim().length > 10);
+    // Real FB: biggest div[dir="auto"] that is NOT inside a nested article (comments)
+    const divTexts = qsa(el, 'div[dir="auto"]').filter(d => {
+      const t = d.textContent.trim();
+      if (t.length < 10) return false;
+      // Skip if inside a nested article (comment)
+      let p = d.parentElement;
+      while (p && p !== el) {
+        if (p.getAttribute('role') === 'article') return false;
+        p = p.parentElement;
+      }
+      return true;
+    });
+    if (divTexts.length) {
+      return divTexts.reduce((a, b) =>
+        a.textContent.length > b.textContent.length ? a : b
+      ).textContent.trim();
+    }
+    // Fallback: biggest span[dir=auto] not in nested article
+    const spans = qsa(el, 'span[dir="auto"]').filter(s => {
+      if (s.textContent.trim().length < 10) return false;
+      let p = s.parentElement;
+      while (p && p !== el) {
+        if (p.getAttribute('role') === 'article') return false;
+        p = p.parentElement;
+      }
+      return true;
+    });
     if (spans.length) {
       return spans.reduce((a, b) =>
         a.textContent.length > b.textContent.length ? a : b
@@ -86,6 +111,12 @@
   function extractImages(el) {
     const srcs = new Set();
     qsa(el, 'img').forEach(img => {
+      // Skip images inside nested articles (comments, commenter avatars)
+      let p = img.parentElement;
+      while (p && p !== el) {
+        if (p.getAttribute('role') === 'article') return;
+        p = p.parentElement;
+      }
       const src = img.src || img.getAttribute('data-src') || '';
       if (src && src.includes('fbcdn') && !src.includes('emoji') && !src.includes('static'))
         srcs.add(src);
@@ -248,11 +279,21 @@
 
   /* ── find action bar (Like / Comment / Share row) ───────────────── */
   function findActionBar(postEl) {
-    // 1. Toolbar role (most reliable on current FB)
-    const tb = qs(postEl, 'div[role="toolbar"]');
+    // Returns true if el lives inside a comment article nested within postEl
+    function inNestedArticle(el) {
+      let p = el.parentElement;
+      while (p && p !== postEl) {
+        if (p.getAttribute('role') === 'article') return true;
+        p = p.parentElement;
+      }
+      return false;
+    }
+
+    // 1. Toolbar role that belongs to the post (not a comment toolbar)
+    const tb = qsa(postEl, 'div[role="toolbar"]').find(t => !inNestedArticle(t));
     if (tb) return tb;
 
-    // 2. Find by one of the known action buttons, then return its parent row
+    // 2. Post-level action buttons only (Like/Comment/Share on the post itself)
     const actionSelectors = [
       '[aria-label="Like"]',
       '[aria-label="Thích"]',
@@ -262,20 +303,17 @@
       '[aria-label="Chia sẻ"]',
     ];
     for (const s of actionSelectors) {
-      const btn = qs(postEl, s);
+      const btn = qsa(postEl, s).find(b => !inNestedArticle(b));
       if (btn) {
-        // Walk up 2–3 levels to find the flex row
         let p = btn.parentElement;
-        for (let i = 0; i < 3 && p && p !== postEl; i++) {
+        for (let i = 0; i < 5 && p && p !== postEl; i++) {
           if (p.children.length >= 2) return p;
           p = p.parentElement;
         }
       }
     }
 
-    // 3. Fallback: last child div of the article (usually the action area)
-    const divs = qsa(postEl, ':scope > div > div');
-    return divs[divs.length - 1] || null;
+    return null;
   }
 
   /* ── inject into action bar ─────────────────────────────────────── */
@@ -320,10 +358,21 @@
     return !!el.parentElement?.closest('[role="article"]');
   }
 
+  function looksLikePost(el) {
+    // Must have a permalink/story URL (posts always do; comment-section wrappers don't)
+    if (qs(el, 'a[href*="/posts/"], a[href*="story_fbid"], a[href*="permalink/"]')) return true;
+    // Marketplace items: no permalink but have marketplace URL
+    if (qs(el, 'a[href*="/marketplace/item/"]')) return true;
+    // Group posts sometimes only have the group URL; accept if has a seller link
+    if (qs(el, 'a[href*="/groups/"][href*="/user/"]')) return true;
+    return false;
+  }
+
   function scan() {
     const articles = qsa(document, 'div[role="article"]');
     articles.forEach(el => {
-      if (isComment(el)) return;   // skip comments / replies
+      if (isComment(el)) return;      // skip comment articles nested inside posts
+      if (!looksLikePost(el)) return; // skip comment-section containers, ads, etc.
       injectIntoPost(el);
     });
 
