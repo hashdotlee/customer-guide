@@ -280,7 +280,7 @@
   /* ── find action bar using Share button as post anchor ─────────── */
   function findActionBar(postEl) {
     // Posts always have Share; comments only have Reply — use this to distinguish.
-    // Try to find a Share-type button and walk up to its row container.
+    // We must verify the Share button found is NOT inside a nested article (comment).
     const shareSelectors = [
       '[aria-label="Share"]',
       '[aria-label^="Share "]',
@@ -288,27 +288,27 @@
       '[aria-label^="Chia sẻ"]',
     ];
     for (const s of shareSelectors) {
-      const btn = qs(postEl, s);
-      if (!btn) continue;
-      let p = btn.parentElement;
-      for (let i = 0; i < 6 && p && p !== postEl; i++) {
-        if (p.children.length >= 2) return p;
-        p = p.parentElement;
+      const allMatches = qsa(postEl, s);
+      for (const shareBtn of allMatches) {
+        // Skip Share buttons that live inside a nested article (i.e. a comment)
+        let ancestor = shareBtn.parentElement;
+        let insideComment = false;
+        while (ancestor && ancestor !== postEl) {
+          if (ancestor.getAttribute('role') === 'article') { insideComment = true; break; }
+          ancestor = ancestor.parentElement;
+        }
+        if (insideComment) continue;
+
+        // Walk up to find the action bar row container
+        let p = shareBtn.parentElement;
+        for (let i = 0; i < 6 && p && p !== postEl; i++) {
+          if (p.children.length >= 2) return p;
+          p = p.parentElement;
+        }
       }
     }
 
-    // Fallback: "bài viết" appears in post-level Like/Comment aria-labels in Vietnamese FB
-    //           ("Thích bài viết của X", "Bình luận bài viết của X") but NOT in comment buttons
-    const postBtn = qs(postEl, '[aria-label*="bài viết"], [aria-label*="this post"]');
-    if (postBtn) {
-      let p = postBtn.parentElement;
-      for (let i = 0; i < 6 && p && p !== postEl; i++) {
-        if (p.children.length >= 2) return p;
-        p = p.parentElement;
-      }
-    }
-
-    return null; // No post-level action found → this is not a post article
+    return null; // No post-level Share found → this is not a post article
   }
 
   /* ── inject into action bar ─────────────────────────────────────── */
