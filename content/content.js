@@ -124,6 +124,41 @@
     return `post_h${Math.abs(hash)}`;
   }
 
+  /* ── extract group info ─────────────────────────────────────────── */
+  function extractGroupInfo() {
+    const url  = window.location.href;
+    const path = window.location.pathname;
+
+    // Only relevant on group pages
+    const groupMatch = path.match(/\/groups\/([^/?#]+)/);
+    if (!groupMatch) return {};
+
+    const groupId  = groupMatch[1];
+    const groupUrl = `${window.location.origin}/groups/${groupId}`;
+
+    // Group name: try multiple selectors
+    const nameSels = [
+      'h1',
+      '[role="main"] h1',
+      'a[href*="/groups/"] span',
+      'nav [aria-current] span',
+    ];
+    let groupName = '';
+    for (const s of nameSels) {
+      const el = qs(document, s);
+      if (el?.textContent?.trim() && el.textContent.trim().length < 120) {
+        groupName = el.textContent.trim();
+        break;
+      }
+    }
+    // Fallback: page title (FB sets it to "Group Name | Facebook")
+    if (!groupName && document.title) {
+      groupName = document.title.replace(/\s*[|–-].*$/, '').trim();
+    }
+
+    return { groupId, groupName, groupUrl };
+  }
+
   function buildPostData(el) {
     const { sellerName, sellerUrl } = extractSeller(el);
     const isMP = /\/marketplace/.test(window.location.pathname) ||
@@ -137,6 +172,7 @@
       savedAt: new Date().toISOString(),
       isMarketplace: isMP,
       pageUrl: window.location.href,
+      ...extractGroupInfo(),
     };
   }
 
@@ -257,11 +293,15 @@
   }
 
   /* ── scan all posts ─────────────────────────────────────────────── */
+  function isComment(el) {
+    // Comments are articles nested inside another article (FB uses same role for both)
+    return !!el.parentElement?.closest('[role="article"]');
+  }
+
   function scan() {
     const articles = qsa(document, 'div[role="article"]');
     articles.forEach(el => {
-      // Skip articles nested inside another already-injected article
-      if (el.closest(`[${INJECTED}]`) && !el.hasAttribute(INJECTED)) return;
+      if (isComment(el)) return;   // skip comments / replies
       injectIntoPost(el);
     });
 

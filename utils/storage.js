@@ -200,6 +200,7 @@ export class StorageManager {
         product.sellerName,
         product.notes,
         product.category,
+        product.groupName,
         ...(product.tags ?? []),
         ...(product.keyFeatures ?? []),
       ]
