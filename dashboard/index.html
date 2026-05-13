@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FB Order Saver – Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">🛍️</span>
+      <span class="logo-text">FB Order Saver</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-view="all">
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Tất cả sản phẩm
+      </a>
+      <a href="#" class="nav-item" data-view="compare">
+        <svg viewBox="0 0 24 24"><path d="M10 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h5v2h2V1h-2v2zm0 15H5l4-4v4zm0-10-4-4h4v4zm4-4v20h2v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-5V1h-2zm2 18V5h5v14h-5z"/></svg>
+        So sánh sản phẩm
+        <span class="compare-badge" id="compareBadge">0</span>
+      </a>
+      <a href="#" class="nav-item" data-view="tags">
+        <svg viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>
+        Theo thẻ
+      </a>
+      <a href="#" class="nav-item" data-view="export">
+        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        Xuất / Nhập dữ liệu
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="../settings/settings.html" class="nav-item" target="_blank">
+        <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+        Cài đặt
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+    <!-- Header bar -->
+    <header class="topbar">
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" id="searchInput" class="search-input" placeholder="Tìm kiếm sản phẩm..." />
+        <button class="search-clear" id="searchClear" hidden>✕</button>
+      </div>
+      <div class="topbar-actions">
+        <select id="sortSelect" class="select-control">
+          <option value="savedAt_desc">Mới nhất</option>
+          <option value="savedAt_asc">Cũ nhất</option>
+          <option value="price_asc">Giá tăng dần</option>
+          <option value="price_desc">Giá giảm dần</option>
+          <option value="title_asc">Tên A-Z</option>
+        </select>
+        <select id="filterCondition" class="select-control">
+          <option value="">Tất cả tình trạng</option>
+          <option value="new">Mới</option>
+          <option value="like_new">Như mới</option>
+          <option value="used">Đã qua sử dụng</option>
+          <option value="old">Cũ</option>
+        </select>
+        <button class="btn btn-primary" id="compareBtn" disabled>
+          <svg viewBox="0 0 24 24"><path d="M10 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h5v2h2V1h-2v2zm0 15H5l4-4v4zm0-10-4-4h4v4zm4-4v20h2v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-5V1h-2zm2 18V5h5v14h-5z"/></svg>
+          So sánh (<span id="compareCount">0</span>)
+        </button>
+      </div>
+    </header>
+
+    <!-- Stats bar -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-item">
+        <span class="stat-value" id="totalCount">0</span>
+        <span class="stat-label">Tổng sản phẩm</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value" id="todayCount">0</span>
+        <span class="stat-label">Hôm nay</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value" id="analyzedCount">0</span>
+        <span class="stat-label">Đã phân tích AI</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value" id="avgPrice">–</span>
+        <span class="stat-label">Giá trung bình</span>
+      </div>
+    </div>
+
+    <!-- View: All products -->
+    <div id="viewAll" class="view active">
+      <div class="products-grid" id="productsGrid">
+        <!-- Products rendered here -->
+      </div>
+      <div class="empty-state" id="emptyState" hidden>
+        <div class="empty-icon">📦</div>
+        <h3>Chưa có sản phẩm nào</h3>
+        <p>Hãy vào Facebook và nhấn nút "Lưu đơn hàng" trên các bài đăng.</p>
+      </div>
+      <div class="loading-state" id="loadingState">
+        <div class="spinner"></div>
+        <p>Đang tải...</p>
+      </div>
+    </div>
+
+    <!-- View: Compare -->
+    <div id="viewCompare" class="view">
+      <div class="compare-header">
+        <h2>So sánh sản phẩm</h2>
+        <p class="compare-hint">Chọn sản phẩm từ danh sách (tối đa 4) để so sánh</p>
+        <button class="btn btn-ghost" id="clearCompare">Xóa tất cả</button>
+      </div>
+      <div class="compare-table-wrap" id="compareTableWrap">
+        <div class="compare-empty">
+          <p>Chưa chọn sản phẩm nào để so sánh.</p>
+          <button class="btn btn-primary" onclick="setView('all')">Chọn sản phẩm</button>
+        </div>
+      </div>
+      <div class="ai-compare-result" id="aiCompareResult" hidden>
+        <h3>🤖 Phân tích AI</h3>
+        <div id="aiCompareContent"></div>
+      </div>
+    </div>
+
+    <!-- View: Tags -->
+    <div id="viewTags" class="view">
+      <div class="tags-container" id="tagsContainer">
+        <div class="loading-state"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- View: Export -->
+    <div id="viewExport" class="view">
+      <div class="export-section">
+        <h2>Xuất / Nhập dữ liệu</h2>
+        <div class="export-cards">
+          <div class="export-card">
+            <div class="export-card-icon">📤</div>
+            <h3>Xuất dữ liệu</h3>
+            <p>Tải xuống toàn bộ dữ liệu sản phẩm dưới dạng JSON.</p>
+            <button class="btn btn-primary" id="exportBtn">Xuất JSON</button>
+          </div>
+          <div class="export-card">
+            <div class="export-card-icon">📥</div>
+            <h3>Nhập dữ liệu</h3>
+            <p>Nhập dữ liệu từ file JSON đã xuất trước đó.</p>
+            <input type="file" id="importFile" accept=".json" hidden />
+            <button class="btn btn-secondary" id="importBtn">Chọn file JSON</button>
+          </div>
+          <div class="export-card">
+            <div class="export-card-icon">🗑️</div>
+            <h3>Xóa dữ liệu</h3>
+            <p>Xóa toàn bộ sản phẩm đã lưu. Hành động này không thể hoàn tác.</p>
+            <button class="btn btn-danger" id="deleteAllBtn">Xóa tất cả</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Product detail modal -->
+  <div class="modal-overlay" id="modalOverlay" hidden>
+    <div class="modal" id="productModal">
+      <button class="modal-close" id="modalClose">✕</button>
+      <div class="modal-content" id="modalContent"></div>
+    </div>
+  </div>
+
+  <!-- Compare AI loading overlay -->
+  <div class="ai-loading-overlay" id="aiLoadingOverlay" hidden>
+    <div class="ai-loading-box">
+      <div class="spinner large"></div>
+      <p>AI đang phân tích và so sánh...</p>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

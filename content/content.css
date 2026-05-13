@@ -1,0 +1,318 @@
+/**
+ * FB Order Saver – Content Script Styles
+ * All selectors are scoped under the "fbos-" prefix to avoid collisions
+ * with Facebook's own CSS classes.
+ */
+
+/* ─────────────────────────── Reset / Base ─────────────────────────────── */
+
+#fbos-toast-container,
+#fbos-toast-container *,
+.fbos-save-btn,
+.fbos-save-btn *,
+.fbos-saved-indicator,
+.fbos-btn-wrapper,
+.fbos-btn-wrapper * {
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+/* ─────────────────────────── Button wrapper ────────────────────────────── */
+
+.fbos-btn-wrapper {
+  display: inline-flex;
+  align-items: center;
+  margin: 4px 0 4px 4px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  vertical-align: middle;
+  z-index: 10;
+  position: relative;
+}
+
+/* Show button when hovering the ancestor post/card */
+div[role="article"]:hover .fbos-btn-wrapper,
+div[data-testid="marketplace_feed_item"]:hover .fbos-btn-wrapper,
+[data-fbos-btn]:hover .fbos-btn-wrapper,
+[data-fbos-btn] .fbos-btn-wrapper:focus-within {
+  opacity: 1;
+}
+
+/* Always show when saved */
+.fbos-btn-wrapper:has(.fbos-save-btn--saved) {
+  opacity: 1;
+}
+
+/* ─────────────────────────── Save button ───────────────────────────────── */
+
+.fbos-save-btn {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+
+  /* Gradient */
+  background: linear-gradient(135deg, #4f8ef7 0%, #8b5cf6 100%);
+  color: #ffffff;
+
+  /* Typography */
+  font-size: 12px;
+  font-weight: 600;
+
+  /* Elevation */
+  box-shadow: 0 2px 8px rgba(79, 142, 247, 0.35);
+
+  /* Transition */
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.2s ease,
+    opacity 0.15s ease;
+
+  /* Override any Facebook button resets */
+  outline: none;
+  text-decoration: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.fbos-save-btn:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 14px rgba(79, 142, 247, 0.5);
+  background: linear-gradient(135deg, #3b7de8 0%, #7c3aed 100%);
+}
+
+.fbos-save-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 1px 4px rgba(79, 142, 247, 0.3);
+}
+
+.fbos-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Saved state */
+.fbos-save-btn--saved {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+}
+
+.fbos-save-btn--saved:hover:not(:disabled) {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.5);
+}
+
+.fbos-save-btn__icon {
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.fbos-save-btn__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1;
+}
+
+/* ─────────────────────── Already-saved indicator ───────────────────────── */
+
+.fbos-saved-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 100;
+  background: rgba(22, 163, 74, 0.92);
+  color: #fff;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  cursor: default;
+  pointer-events: none;
+  animation: fbos-indicator-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes fbos-indicator-pop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ─────────────────────── Highlight pulse (HIGHLIGHT_POST) ──────────────── */
+
+.fbos-highlight-pulse {
+  animation: fbos-pulse-ring 2s ease-in-out;
+}
+
+@keyframes fbos-pulse-ring {
+  0%   { outline: 3px solid transparent; outline-offset: 2px; }
+  20%  { outline: 3px solid rgba(79, 142, 247, 0.8); outline-offset: 3px; }
+  60%  { outline: 3px solid rgba(79, 142, 247, 0.4); outline-offset: 5px; }
+  100% { outline: 3px solid transparent; outline-offset: 2px; }
+}
+
+/* ─────────────────────── Compare checkbox (on hover) ───────────────────── */
+
+.fbos-compare-checkbox-wrapper {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 99;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+div[role="article"]:hover .fbos-compare-checkbox-wrapper,
+[data-fbos-btn]:hover .fbos-compare-checkbox-wrapper {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.fbos-compare-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(79, 142, 247, 0.7);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  display: block;
+}
+
+.fbos-compare-checkbox:checked {
+  background: linear-gradient(135deg, #4f8ef7 0%, #8b5cf6 100%);
+  border-color: transparent;
+}
+
+.fbos-compare-checkbox:checked::after {
+  content: '✓';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+
+/* ─────────────────────────── Toast container ───────────────────────────── */
+
+#fbos-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647; /* max z-index */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+/* ─────────────────────────── Individual toast ──────────────────────────── */
+
+.fbos-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  max-width: 320px;
+  min-width: 200px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.18),
+    0 1px 4px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+  cursor: default;
+  user-select: none;
+
+  /* Enter state: invisible and shifted right */
+  opacity: 0;
+  transform: translateX(40px);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Type: info (default) */
+  background: linear-gradient(135deg, #4f8ef7 0%, #6366f1 100%);
+}
+
+/* Visible state */
+.fbos-toast--visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Exit state */
+.fbos-toast--exit {
+  opacity: 0;
+  transform: translateX(40px);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+/* Success toast */
+.fbos-toast--success {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+/* Error toast */
+.fbos-toast--error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.fbos-toast__icon {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fbos-toast__msg {
+  flex: 1;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* ─────────────────────── Responsive / small screens ────────────────────── */
+
+@media (max-width: 480px) {
+  #fbos-toast-container {
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    align-items: stretch;
+  }
+
+  .fbos-toast {
+    max-width: 100%;
+    min-width: unset;
+  }
+
+  .fbos-save-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+}
