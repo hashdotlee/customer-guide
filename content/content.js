@@ -277,51 +277,48 @@
     return btn;
   }
 
-  /* ── find action bar (Like / Comment / Share row) ───────────────── */
+  /* ── find action bar using Share button as post anchor ─────────── */
   function findActionBar(postEl) {
-    // Returns true if el lives inside a comment article nested within postEl
-    function inNestedArticle(el) {
-      let p = el.parentElement;
-      while (p && p !== postEl) {
-        if (p.getAttribute('role') === 'article') return true;
+    // Posts always have Share; comments only have Reply — use this to distinguish.
+    // Try to find a Share-type button and walk up to its row container.
+    const shareSelectors = [
+      '[aria-label="Share"]',
+      '[aria-label^="Share "]',
+      '[aria-label="Chia sẻ"]',
+      '[aria-label^="Chia sẻ"]',
+    ];
+    for (const s of shareSelectors) {
+      const btn = qs(postEl, s);
+      if (!btn) continue;
+      let p = btn.parentElement;
+      for (let i = 0; i < 6 && p && p !== postEl; i++) {
+        if (p.children.length >= 2) return p;
         p = p.parentElement;
       }
-      return false;
     }
 
-    // 1. Toolbar role that belongs to the post (not a comment toolbar)
-    const tb = qsa(postEl, 'div[role="toolbar"]').find(t => !inNestedArticle(t));
-    if (tb) return tb;
-
-    // 2. Post-level action buttons only (Like/Comment/Share on the post itself)
-    const actionSelectors = [
-      '[aria-label="Like"]',
-      '[aria-label="Thích"]',
-      '[aria-label="Comment"]',
-      '[aria-label="Bình luận"]',
-      '[aria-label="Share"]',
-      '[aria-label="Chia sẻ"]',
-    ];
-    for (const s of actionSelectors) {
-      const btn = qsa(postEl, s).find(b => !inNestedArticle(b));
-      if (btn) {
-        let p = btn.parentElement;
-        for (let i = 0; i < 5 && p && p !== postEl; i++) {
-          if (p.children.length >= 2) return p;
-          p = p.parentElement;
-        }
+    // Fallback: "bài viết" appears in post-level Like/Comment aria-labels in Vietnamese FB
+    //           ("Thích bài viết của X", "Bình luận bài viết của X") but NOT in comment buttons
+    const postBtn = qs(postEl, '[aria-label*="bài viết"], [aria-label*="this post"]');
+    if (postBtn) {
+      let p = postBtn.parentElement;
+      for (let i = 0; i < 6 && p && p !== postEl; i++) {
+        if (p.children.length >= 2) return p;
+        p = p.parentElement;
       }
     }
 
-    return null;
+    return null; // No post-level action found → this is not a post article
   }
 
   /* ── inject into action bar ─────────────────────────────────────── */
   function injectIntoPost(postEl) {
-    // Guard: already injected
     if (postEl.hasAttribute(INJECTED)) return;
-    // Guard: too little content (ads, widgets)
     if ((postEl.textContent?.trim().length || 0) < 30) return;
+
+    // findActionBar returns null when no post-level Share/Like exists → skip comments
+    const bar = findActionBar(postEl);
+    if (!bar) return;
 
     const postId  = getPostId(postEl);
     const isSaved = savedIds.has(postId);
@@ -336,44 +333,21 @@
       handleSave(postEl, btn);
     });
 
-    const bar = findActionBar(postEl);
-    if (bar) {
-      // Wrap to avoid inheriting flex styles from FB's toolbar
-      const wrap = document.createElement('div');
-      wrap.className = `${PFX}-wrap`;
-      wrap.appendChild(btn);
-      bar.appendChild(wrap);
-    } else {
-      // Absolute fallback: insert near the top of the article
-      const wrap = document.createElement('div');
-      wrap.className = `${PFX}-wrap ${PFX}-wrap--float`;
-      wrap.appendChild(btn);
-      postEl.insertBefore(wrap, postEl.firstChild);
-    }
+    const wrap = document.createElement('div');
+    wrap.className = `${PFX}-wrap`;
+    wrap.appendChild(btn);
+    bar.appendChild(wrap);
   }
 
   /* ── scan all posts ─────────────────────────────────────────────── */
   function isComment(el) {
-    // Comments are articles nested inside another article (FB uses same role for both)
     return !!el.parentElement?.closest('[role="article"]');
   }
 
-  function looksLikePost(el) {
-    // Must have a permalink/story URL (posts always do; comment-section wrappers don't)
-    if (qs(el, 'a[href*="/posts/"], a[href*="story_fbid"], a[href*="permalink/"]')) return true;
-    // Marketplace items: no permalink but have marketplace URL
-    if (qs(el, 'a[href*="/marketplace/item/"]')) return true;
-    // Group posts sometimes only have the group URL; accept if has a seller link
-    if (qs(el, 'a[href*="/groups/"][href*="/user/"]')) return true;
-    return false;
-  }
-
   function scan() {
-    const articles = qsa(document, 'div[role="article"]');
-    articles.forEach(el => {
-      if (isComment(el)) return;      // skip comment articles nested inside posts
-      if (!looksLikePost(el)) return; // skip comment-section containers, ads, etc.
-      injectIntoPost(el);
+    qsa(document, 'div[role="article"]').forEach(el => {
+      if (isComment(el)) return; // quick bailout for clearly nested comment articles
+      injectIntoPost(el);        // findActionBar inside will reject non-posts
     });
 
     // Marketplace cards
