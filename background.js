@@ -189,19 +189,23 @@ async function handleMessage(message, sender) {
       return handleExportData();
 
     case 'IMPORT_DATA':
-      return handleImportData(message.data || message.json);
+    case 'IMPORT_PRODUCTS':
+      return handleImportData(message.data || message.products || message.json);
 
     case 'DELETE_ALL_PRODUCTS':
+    case 'DELETE_ALL_DATA':
       return handleDeleteAllProducts();
 
     case 'UPDATE_PRODUCT_NOTES':
       return handleUpdateProductNotes(message.id, message.notes);
 
     case 'TEST_API':
-      return handleTestApi(message.settings);
+      // settings.js sends { type, provider, apiKey }
+      // other callers may send { type, settings: { aiProvider, apiKey } }
+      return handleTestApi(message.settings || message);
 
     case 'SYNC_NOW':
-      return handleSyncNow();
+      return handleSyncNow(message);
 
     case 'OPEN_DASHBOARD':
       return handleOpenDashboard();
@@ -496,10 +500,17 @@ async function handleUpdateProductNotes(id, notes) {
 // ─── Handler: TEST_API ────────────────────────────────────────────────────────
 
 async function handleTestApi(testSettings) {
+  if (!testSettings || typeof testSettings !== 'object') {
+    return { success: false, ok: false, error: 'Thiếu thông tin cài đặt.' };
+  }
   try {
+    const provider = testSettings.aiProvider || testSettings.provider || 'openai';
+    const apiKey   = testSettings.apiKey || '';
+    if (!apiKey) return { success: false, ok: false, error: 'Chưa nhập API key.' };
+
     const tempAI = new AIService({
-      provider: testSettings.aiProvider || testSettings.provider || 'openai',
-      apiKey: testSettings.apiKey || '',
+      provider,
+      apiKey,
       cloudEndpoint: testSettings.cloudEndpoint || '',
     });
     const result = await tempAI.analyzePost({
@@ -507,27 +518,27 @@ async function handleTestApi(testSettings) {
       images: [],
     });
     if (result) {
-      return { ok: true, message: 'Kết nối thành công!' };
+      return { success: true, ok: true, message: 'Kết nối thành công!' };
     }
-    return { ok: false, error: 'Không nhận được kết quả từ AI.' };
+    return { success: false, ok: false, error: 'Không nhận được kết quả từ AI.' };
   } catch (err) {
-    return { ok: false, error: err.message };
+    return { success: false, ok: false, error: err.message };
   }
 }
 
 // ─── Handler: SYNC_NOW ────────────────────────────────────────────────────────
 
-async function handleSyncNow() {
-  const settings = await storage.getSettings();
+async function handleSyncNow(msg = {}) {
+  const stored = await storage.getSettings();
+  // Allow caller to pass endpoint/key directly (settings.js sends them inline)
+  const endpoint = msg.endpoint || stored.cloudEndpoint || stored.syncEndpoint || '';
+  const apiKey   = msg.cloudApiKey || stored.syncApiKey || stored.cloudApiKey || '';
 
-  if (!settings.syncEnabled) {
-    return { success: false, error: 'Cloud sync chưa được bật.' };
-  }
-  if (!settings.syncEndpoint || !settings.syncApiKey) {
-    return { success: false, error: 'Chưa cấu hình địa chỉ và API key cho cloud sync.' };
-  }
+  if (!endpoint) return { success: false, error: 'Chưa cấu hình Cloud endpoint.' };
+  if (!apiKey)   return { success: false, error: 'Chưa cấu hình Cloud API key.' };
 
-  const result = await performCloudSync(settings);
+  const syncSettings = { ...stored, syncEndpoint: endpoint, syncApiKey: apiKey };
+  const result = await performCloudSync(syncSettings);
   return result;
 }
 

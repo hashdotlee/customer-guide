@@ -309,10 +309,24 @@ body {
 .badge-unknown { background: var(--bg3); color: var(--text3); }
 .badge-ai { background: rgba(99,102,241,.15); color: var(--accent2); }
 
+.card-group {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-group a {
+  color: var(--accent2);
+  text-decoration: none;
+}
+.card-group a:hover { text-decoration: underline; }
+
 .card-date {
   font-size: 11px;
   color: var(--text3);
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .card-actions {

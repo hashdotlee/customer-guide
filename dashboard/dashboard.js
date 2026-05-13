@@ -204,6 +204,7 @@
           <span class="badge badge-${conditionClass}">${conditionLabel}</span>
           ${product.aiAnalyzed ? '<span class="badge badge-ai">🤖 AI</span>' : ''}
         </div>
+        ${product.groupName ? `<div class="card-group">👥 <a href="${escHtml(product.groupUrl||'#')}" target="_blank" onclick="event.stopPropagation()">${escHtml(product.groupName)}</a></div>` : ''}
         <div class="card-date">${formatDate(product.savedAt)}</div>
       </div>
       <div class="card-actions">
@@ -278,6 +279,11 @@
           <label>Tình trạng</label>
           <p><span class="badge badge-${getConditionClass(product.condition || ai.condition)}">${conditionLabel}</span></p>
         </div>
+        ${product.groupName ? `
+        <div class="modal-field">
+          <label>Nhóm bán hàng</label>
+          <p><a href="${escHtml(product.groupUrl || '#')}" target="_blank" style="color:var(--accent2)">👥 ${escHtml(product.groupName)}</a></p>
+        </div>` : ''}
         <div class="modal-field">
           <label>Đã lưu lúc</label>
           <p>${formatDateFull(product.savedAt)}</p>
