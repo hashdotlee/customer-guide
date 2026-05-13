@@ -94,16 +94,34 @@
   }
 
   function extractSeller(el) {
+    // Group posts: seller link is /groups/[id]/user/[userId]/
+    const groupUserLink = qs(el, 'a[href*="/groups/"][href*="/user/"]');
+    if (groupUserLink) {
+      const name = groupUserLink.getAttribute('aria-label') ||
+                   qs(groupUserLink, 'span')?.textContent?.trim() ||
+                   groupUserLink.textContent.trim();
+      if (name) return { sellerName: name, sellerUrl: groupUserLink.href.split('?')[0] };
+    }
+    // Personal posts: <a aria-label="NAME" href="...profile.php?id=...">
+    const profilePhpLink = qs(el, 'a[aria-label][href*="profile.php"]');
+    if (profilePhpLink) {
+      const name = profilePhpLink.getAttribute('aria-label');
+      if (name) {
+        const u = new URL(profilePhpLink.href);
+        const sellerUrl = `${u.origin}${u.pathname}?id=${u.searchParams.get('id')}`;
+        return { sellerName: name, sellerUrl };
+      }
+    }
+    // data-ad-rendering-role="profile_name" pattern (personal posts alternate)
+    const profileNameEl = qs(el, '[data-ad-rendering-role="profile_name"] a');
+    if (profileNameEl?.textContent?.trim()) {
+      return { sellerName: profileNameEl.textContent.trim(), sellerUrl: profileNameEl.href };
+    }
+    // Profile links via h2/h3/h4
     for (const tag of ['h2','h3','h4','strong']) {
       const a = qs(el, `${tag} a[href]`);
       if (a?.textContent?.trim()) return { sellerName: a.textContent.trim(), sellerUrl: a.href };
     }
-    const links = qsa(el, 'a[href*="facebook.com/"]').filter(a => {
-      const t = a.textContent.trim();
-      return t.length > 1 && t.length < 80 &&
-             !a.href.includes('/posts/') && !a.href.includes('story_fbid');
-    });
-    if (links.length) return { sellerName: links[0].textContent.trim(), sellerUrl: links[0].href };
     return { sellerName: '', sellerUrl: '' };
   }
 
@@ -125,33 +143,37 @@
   }
 
   /* ── extract group info ─────────────────────────────────────────── */
-  function extractGroupInfo() {
-    const url  = window.location.href;
-    const path = window.location.pathname;
+  function extractGroupInfo(postEl) {
+    // Primary: group link with aria-label directly on the post element
+    // FB renders: <a aria-label="GROUP NAME" href="/groups/ID/?...">
+    const groupLink = postEl
+      ? qs(postEl, 'a[href*="/groups/"][aria-label]:not([href*="/user/"])')
+      : null;
+    if (groupLink) {
+      const m = groupLink.href.match(/\/groups\/([^/?#]+)/);
+      return {
+        groupId:   m ? m[1] : '',
+        groupName: groupLink.getAttribute('aria-label') || '',
+        groupUrl:  m ? `${location.origin}/groups/${m[1]}` : groupLink.href.split('?')[0],
+      };
+    }
 
-    // Only relevant on group pages
-    const groupMatch = path.match(/\/groups\/([^/?#]+)/);
-    if (!groupMatch) return {};
+    // Fallback: URL-based (when on a group page directly)
+    const urlMatch = location.pathname.match(/\/groups\/([^/?#]+)/);
+    if (!urlMatch) return {};
 
-    const groupId  = groupMatch[1];
-    const groupUrl = `${window.location.origin}/groups/${groupId}`;
+    const groupId  = urlMatch[1];
+    const groupUrl = `${location.origin}/groups/${groupId}`;
+    let groupName  = '';
 
-    // Group name: try multiple selectors
-    const nameSels = [
-      'h1',
-      '[role="main"] h1',
-      'a[href*="/groups/"] span',
-      'nav [aria-current] span',
-    ];
-    let groupName = '';
+    const nameSels = ['h1', '[role="main"] h1', 'a[href*="/groups/"] span', 'nav [aria-current] span'];
     for (const s of nameSels) {
       const el = qs(document, s);
-      if (el?.textContent?.trim() && el.textContent.trim().length < 120) {
+      if (el?.textContent?.trim().length > 0 && el.textContent.trim().length < 120) {
         groupName = el.textContent.trim();
         break;
       }
     }
-    // Fallback: page title (FB sets it to "Group Name | Facebook")
     if (!groupName && document.title) {
       groupName = document.title.replace(/\s*[|–-].*$/, '').trim();
     }
@@ -172,7 +194,7 @@
       savedAt: new Date().toISOString(),
       isMarketplace: isMP,
       pageUrl: window.location.href,
-      ...extractGroupInfo(),
+      ...extractGroupInfo(el),
     };
   }
 
