@@ -1,61 +1,78 @@
-/* FB Order Saver – Content Styles (all scoped to fbos- prefix) */
+/* FB Order Saver – Content CSS (all prefixed fbos-) */
 
-/* ── Button wrapper: absolute top-right of each post ───────────── */
+/* ── Button wrapper inside action bar ──────────────────────────── */
 .fbos-wrap {
-  position: absolute !important;
-  top: 10px !important;
-  right: 10px !important;
-  z-index: 9999 !important;
-  pointer-events: auto !important;
-  /* Visible by default – no opacity trick */
+  display: inline-flex !important;
+  align-items: center !important;
+  margin-left: 4px !important;
+  flex-shrink: 0 !important;
+  /* block any FB flex/grid overrides */
+  align-self: center !important;
 }
 
-/* ── Save button ────────────────────────────────────────────────── */
+/* Floating fallback (when action bar not found) */
+.fbos-wrap--float {
+  display: block !important;
+  padding: 6px 12px 2px !important;
+}
+
+/* ── Save button ─────────────────────────────────────────────────── */
 .fbos-btn {
+  /* Reset */
+  all: unset !important;
+  /* Layout */
   display: inline-flex !important;
   align-items: center !important;
   gap: 5px !important;
-  padding: 5px 11px !important;
-  border: none !important;
+  padding: 6px 13px !important;
   border-radius: 20px !important;
   cursor: pointer !important;
+  /* Colours */
   background: linear-gradient(135deg, #4f8ef7 0%, #8b5cf6 100%) !important;
   color: #fff !important;
-  font-size: 12px !important;
+  /* Text */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 13px !important;
   font-weight: 600 !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-  box-shadow: 0 2px 8px rgba(99,102,241,.4) !important;
-  transition: transform .15s, box-shadow .15s !important;
+  line-height: 1.2 !important;
   white-space: nowrap !important;
-  outline: none !important;
-  -webkit-appearance: none !important;
-  appearance: none !important;
-  /* Semi-transparent so post content is visible underneath */
-  opacity: 0.88;
+  /* Shadow */
+  box-shadow: 0 2px 8px rgba(99,102,241,.35) !important;
+  /* Animation */
+  transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease !important;
+  opacity: 0.92 !important;
+  user-select: none !important;
 }
+
 .fbos-btn:hover:not(:disabled) {
   opacity: 1 !important;
-  transform: scale(1.05) !important;
-  box-shadow: 0 4px 14px rgba(99,102,241,.55) !important;
+  transform: scale(1.04) translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(99,102,241,.5) !important;
 }
+
 .fbos-btn:active:not(:disabled) {
   transform: scale(0.97) !important;
 }
+
 .fbos-btn:disabled {
-  opacity: 0.55 !important;
-  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+  cursor: default !important;
 }
 
 /* Saved state */
 .fbos-btn--saved {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
-  box-shadow: 0 2px 8px rgba(34,197,94,.4) !important;
+  box-shadow: 0 2px 8px rgba(34,197,94,.35) !important;
 }
 
-.fbos-btn-icon { font-size: 13px !important; line-height: 1 !important; }
-.fbos-btn-label { font-size: 12px !important; font-weight: 600 !important; color: #fff !important; }
+.fbos-btn--saved:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(34,197,94,.5) !important;
+}
 
-/* ── Toast container ─────────────────────────────────────────────── */
+.fbos-bi { font-size: 13px !important; line-height: 1 !important; }
+.fbos-bl { font-size: 13px !important; font-weight: 600 !important; color: #fff !important; }
+
+/* ── Toast container ────────────────────────────────────────────── */
 #fbos-toasts {
   position: fixed !important;
   bottom: 24px !important;
@@ -68,19 +85,20 @@
   pointer-events: none !important;
 }
 
-/* ── Toast ───────────────────────────────────────────────────────── */
+/* ── Toast ──────────────────────────────────────────────────────── */
 .fbos-toast {
+  all: unset !important;
   display: inline-flex !important;
   align-items: center !important;
   gap: 8px !important;
   padding: 10px 16px !important;
   border-radius: 10px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
   font-size: 13px !important;
   font-weight: 500 !important;
   color: #fff !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
   max-width: 320px !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,.2) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,.22) !important;
   pointer-events: auto !important;
   background: linear-gradient(135deg, #4f8ef7 0%, #6366f1 100%) !important;
   opacity: 0 !important;
@@ -91,16 +109,7 @@
   opacity: 1 !important;
   transform: translateX(0) !important;
 }
-.fbos-toast--success {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
-}
-.fbos-toast--error {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
-}
+.fbos-toast--success { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important; }
+.fbos-toast--error   { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important; }
 
-/* ── Saved indicator pulse ───────────────────────────────────────── */
-.fbos-highlight-pulse {
-  outline: 3px solid rgba(99,102,241,.8) !important;
-  outline-offset: 2px !important;
-  transition: outline .3s !important;
-}
+.fbos-ti { font-size: 15px !important; flex-shrink: 0 !important; }

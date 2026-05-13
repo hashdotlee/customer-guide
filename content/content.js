@@ -2,27 +2,23 @@
   'use strict';
 
   const PFX = 'fbos';
-  const INJECTED_ATTR = `data-${PFX}-injected`;
-  const SAVED_ATTR = `data-${PFX}-saved`;
-  const DEBOUNCE_MS = 500;
+  const INJECTED = `data-${PFX}-injected`;
+  const SAVED    = `data-${PFX}-saved`;
 
-  /* ─── Utilities ─────────────────────────────────────────────── */
-  function qs(root, sel) { try { return root.querySelector(sel); } catch { return null; } }
-  function qsa(root, sel) { try { return Array.from(root.querySelectorAll(sel)); } catch { return []; } }
+  /* ── utils ──────────────────────────────────────────────────────── */
+  const qs  = (r, s) => { try { return r.querySelector(s); }           catch { return null; } };
+  const qsa = (r, s) => { try { return [...r.querySelectorAll(s)]; }  catch { return []; }   };
 
-  function debounce(fn, ms) {
-    let t;
-    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-  }
+  let _scanTimer = null;
+  function debounceScan() { clearTimeout(_scanTimer); _scanTimer = setTimeout(scan, 600); }
 
-  /* ─── Saved ID cache ─────────────────────────────────────────── */
+  /* ── saved-ID cache ─────────────────────────────────────────────── */
   const savedIds = new Set();
   function loadSavedIds() {
     chrome.storage.local.get('savedPostIds', r => {
       (r.savedPostIds || []).forEach(id => savedIds.add(id));
-      document.querySelectorAll(`[${INJECTED_ATTR}]`).forEach(el => {
-        const id = el.dataset[`${PFX}Id`];
-        if (id && savedIds.has(id)) markSaved(el);
+      qsa(document, `[${INJECTED}]`).forEach(el => {
+        if (savedIds.has(el.dataset[`${PFX}Id`])) markSaved(el);
       });
     });
   }
@@ -34,45 +30,56 @@
     });
   }
 
-  /* ─── Toast ──────────────────────────────────────────────────── */
-  let _toastWrap = null;
-  function getToastWrap() {
-    if (!_toastWrap || !document.body.contains(_toastWrap)) {
-      _toastWrap = document.createElement('div');
-      _toastWrap.id = `${PFX}-toasts`;
-      document.body.appendChild(_toastWrap);
+  /* ── toast ──────────────────────────────────────────────────────── */
+  let _toastRoot = null;
+  function toastRoot() {
+    if (!_toastRoot || !document.body.contains(_toastRoot)) {
+      _toastRoot = document.createElement('div');
+      _toastRoot.id = `${PFX}-toasts`;
+      document.body.appendChild(_toastRoot);
     }
-    return _toastWrap;
+    return _toastRoot;
   }
-  function toast(msg, type = 'info', ms = 3000) {
+  function showToast(msg, type = 'info', ms = 3000) {
     const el = document.createElement('div');
     el.className = `${PFX}-toast ${PFX}-toast--${type}`;
-    el.innerHTML = `<span>${{ info: '🔖', success: '✅', error: '❌' }[type]}</span><span>${msg}</span>`;
-    getToastWrap().appendChild(el);
+    el.innerHTML = `<span class="${PFX}-ti">${{info:'🔖',success:'✅',error:'❌'}[type]||'🔖'}</span><span>${msg}</span>`;
+    toastRoot().appendChild(el);
     requestAnimationFrame(() => el.classList.add(`${PFX}-toast--in`));
-    if (ms) setTimeout(() => { el.classList.remove(`${PFX}-toast--in`); setTimeout(() => el.remove(), 320); }, ms);
+    if (ms > 0) setTimeout(() => dismiss(el), ms);
     return el;
+  }
+  function dismiss(el) {
+    el.classList.remove(`${PFX}-toast--in`);
+    setTimeout(() => el.remove(), 320);
   }
   function updateToast(el, msg, type) {
     el.className = `${PFX}-toast ${PFX}-toast--${type} ${PFX}-toast--in`;
-    el.innerHTML = `<span>${{ info: '🔖', success: '✅', error: '❌' }[type]}</span><span>${msg}</span>`;
-    setTimeout(() => { el.classList.remove(`${PFX}-toast--in`); setTimeout(() => el.remove(), 320); }, 3000);
+    const ti = el.querySelector(`.${PFX}-ti`);
+    if (ti) ti.textContent = {info:'🔖',success:'✅',error:'❌'}[type]||'🔖';
+    const sp = el.querySelectorAll('span')[1];
+    if (sp) sp.textContent = msg;
+    setTimeout(() => dismiss(el), 3200);
   }
 
-  /* ─── Data extraction ────────────────────────────────────────── */
+  /* ── data extraction ────────────────────────────────────────────── */
   function extractText(el) {
-    const sels = [
+    const candidates = [
       '[data-ad-preview="message"]',
+      '[data-ad-comet-preview="message"]',
       '[data-testid="post_message"]',
-      'div[data-ad-comet-preview="message"]',
     ];
-    for (const s of sels) {
+    for (const s of candidates) {
       const n = qs(el, s);
       if (n?.textContent?.trim().length > 5) return n.textContent.trim();
     }
-    // Grab largest span[dir=auto]
+    // Biggest span[dir=auto]
     const spans = qsa(el, 'span[dir="auto"]').filter(s => s.textContent.trim().length > 10);
-    if (spans.length) return spans.reduce((a, b) => a.textContent.length > b.textContent.length ? a : b).textContent.trim();
+    if (spans.length) {
+      return spans.reduce((a, b) =>
+        a.textContent.length > b.textContent.length ? a : b
+      ).textContent.trim();
+    }
     return el.textContent.trim().slice(0, 2000);
   }
 
@@ -80,28 +87,30 @@
     const srcs = new Set();
     qsa(el, 'img').forEach(img => {
       const src = img.src || img.getAttribute('data-src') || '';
-      if (src && src.includes('fbcdn') && !src.includes('emoji') && !src.includes('static')) srcs.add(src);
+      if (src && src.includes('fbcdn') && !src.includes('emoji') && !src.includes('static'))
+        srcs.add(src);
     });
     return [...srcs];
   }
 
   function extractSeller(el) {
-    // First h2/h3/h4 link that looks like a profile
-    for (const tag of ['h2', 'h3', 'h4', 'strong']) {
+    for (const tag of ['h2','h3','h4','strong']) {
       const a = qs(el, `${tag} a[href]`);
       if (a?.textContent?.trim()) return { sellerName: a.textContent.trim(), sellerUrl: a.href };
     }
-    // Link near top of post
     const links = qsa(el, 'a[href*="facebook.com/"]').filter(a => {
       const t = a.textContent.trim();
-      return t.length > 1 && t.length < 80 && !a.href.includes('/posts/') && !a.href.includes('story_fbid');
+      return t.length > 1 && t.length < 80 &&
+             !a.href.includes('/posts/') && !a.href.includes('story_fbid');
     });
     if (links.length) return { sellerName: links[0].textContent.trim(), sellerUrl: links[0].href };
     return { sellerName: '', sellerUrl: '' };
   }
 
   function extractPostUrl(el) {
-    const a = qs(el, 'a[href*="/posts/"], a[href*="story_fbid"], a[href*="permalink/"], a[href*="/marketplace/item/"]');
+    const a = qs(el,
+      'a[href*="/posts/"], a[href*="story_fbid"], a[href*="permalink/"], a[href*="/marketplace/item/"]'
+    );
     return a ? a.href : window.location.href;
   }
 
@@ -115,200 +124,207 @@
     return `post_h${Math.abs(hash)}`;
   }
 
-  function extractMarketData(el) {
-    const data = {};
-    // Price patterns for VND
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      const t = node.textContent.trim();
-      if (/[\d.,]{3,}\s*[đ₫]|[đ₫]\s*[\d.,]{3,}|\d{4,}\s*VND/i.test(t) && t.length < 40) {
-        data.price = t; break;
-      }
-    }
-    // Title from heading
-    const h = qs(el, 'h1, h2, h3, [class*="title"]');
-    if (h) data.title = h.textContent.trim();
-    return data;
-  }
-
-  function isMarketplace() { return /\/marketplace/.test(window.location.pathname); }
-
-  /* ─── Build post data for a given element ─────────────────────── */
   function buildPostData(el) {
-    const postId = getPostId(el);
     const { sellerName, sellerUrl } = extractSeller(el);
-    const isMP = isMarketplace() || !!qs(el, 'a[href*="/marketplace/item/"]');
+    const isMP = /\/marketplace/.test(window.location.pathname) ||
+                 !!qs(el, 'a[href*="/marketplace/item/"]');
     return {
-      id: postId,
+      id: el.dataset[`${PFX}Id`] || getPostId(el),
       rawText: extractText(el),
       images: extractImages(el),
-      sellerName,
-      sellerUrl,
+      sellerName, sellerUrl,
       postUrl: extractPostUrl(el),
       savedAt: new Date().toISOString(),
       isMarketplace: isMP,
       pageUrl: window.location.href,
-      ...(isMP ? extractMarketData(el) : {}),
     };
   }
 
-  /* ─── Mark saved ─────────────────────────────────────────────── */
+  /* ── mark saved ─────────────────────────────────────────────────── */
   function markSaved(postEl) {
-    postEl.setAttribute(SAVED_ATTR, '1');
+    postEl.setAttribute(SAVED, '1');
     const btn = qs(postEl, `.${PFX}-btn`);
-    if (btn) {
-      btn.classList.add(`${PFX}-btn--saved`);
-      btn.title = 'Đã lưu';
-      btn.querySelector(`.${PFX}-btn-icon`).textContent = '🔖';
-      btn.querySelector(`.${PFX}-btn-label`).textContent = 'Đã lưu';
-    }
+    if (!btn) return;
+    btn.classList.add(`${PFX}-btn--saved`);
+    btn.title = 'Đã lưu đơn hàng';
+    const icon  = btn.querySelector(`.${PFX}-bi`);
+    const label = btn.querySelector(`.${PFX}-bl`);
+    if (icon)  icon.textContent  = '🔖';
+    if (label) label.textContent = 'Đã lưu';
   }
 
-  /* ─── Save handler ───────────────────────────────────────────── */
-  async function handleSave(postEl, btn) {
+  /* ── save handler ───────────────────────────────────────────────── */
+  function handleSave(postEl, btn) {
     if (btn.disabled) return;
     btn.disabled = true;
-    const t = toast('Đang lưu...', 'info', 0);
-    try {
-      const postData = buildPostData(postEl);
-      chrome.runtime.sendMessage({ type: 'SAVE_POST', data: postData }, (res) => {
-        if (chrome.runtime.lastError) {
-          updateToast(t, 'Lỗi kết nối extension', 'error');
-          btn.disabled = false;
-          return;
-        }
-        if (res?.success) {
-          persistId(postData.id);
-          markSaved(postEl);
-          updateToast(t, res.aiAnalyzed ? 'Đã lưu & phân tích AI ✓' : 'Đã lưu! (chưa có AI key)', 'success');
-        } else {
-          updateToast(t, `Lỗi: ${res?.error || 'Không xác định'}`, 'error');
-          btn.disabled = false;
-        }
-      });
-    } catch (err) {
-      updateToast(t, 'Lỗi: ' + err.message, 'error');
-      btn.disabled = false;
-    }
+    const t = showToast('Đang lưu...', 'info', 0);
+    const data = buildPostData(postEl);
+    chrome.runtime.sendMessage({ type: 'SAVE_POST', data }, res => {
+      if (chrome.runtime.lastError) {
+        updateToast(t, 'Lỗi kết nối extension', 'error');
+        btn.disabled = false;
+        return;
+      }
+      if (res?.success) {
+        persistId(data.id);
+        markSaved(postEl);
+        updateToast(t, res.aiAnalyzed ? 'Đã lưu & phân tích AI ✓' : 'Đã lưu! (chưa cấu hình AI)', 'success');
+      } else {
+        updateToast(t, `Lỗi: ${res?.error || 'Không xác định'}`, 'error');
+        btn.disabled = false;
+      }
+    });
   }
 
-  /* ─── Inject button ──────────────────────────────────────────── */
-  function injectButton(postEl) {
-    if (postEl.hasAttribute(INJECTED_ATTR)) return;
-
-    // Only inject on elements with some text content (skip stubs/ads)
-    const textLen = postEl.textContent?.trim().length || 0;
-    if (textLen < 20) return;
-
-    const postId = getPostId(postEl);
-    postEl.setAttribute(INJECTED_ATTR, '1');
-    postEl.dataset[`${PFX}Id`] = postId;
-
-    const isSaved = savedIds.has(postId);
-    if (isSaved) postEl.setAttribute(SAVED_ATTR, '1');
-
-    // Create button
+  /* ── create button element ──────────────────────────────────────── */
+  function makeBtn(isSaved) {
     const btn = document.createElement('button');
     btn.className = `${PFX}-btn${isSaved ? ` ${PFX}-btn--saved` : ''}`;
     btn.title = isSaved ? 'Đã lưu đơn hàng' : 'Lưu đơn hàng';
-    btn.innerHTML = `<span class="${PFX}-btn-icon">${isSaved ? '🔖' : '🛍️'}</span><span class="${PFX}-btn-label">${isSaved ? 'Đã lưu' : 'Lưu đơn hàng'}</span>`;
-    btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); handleSave(postEl, btn); });
-
-    // Wrapper – positioned absolutely on top-right of the post
-    const wrap = document.createElement('div');
-    wrap.className = `${PFX}-wrap`;
-    wrap.appendChild(btn);
-
-    // Ensure postEl can contain absolute children
-    const pos = getComputedStyle(postEl).position;
-    if (pos === 'static') postEl.style.position = 'relative';
-
-    postEl.appendChild(wrap);
+    btn.setAttribute('type', 'button');
+    btn.innerHTML =
+      `<span class="${PFX}-bi">${isSaved ? '🔖' : '🛍️'}</span>` +
+      `<span class="${PFX}-bl">${isSaved ? 'Đã lưu' : 'Lưu đơn hàng'}</span>`;
+    return btn;
   }
 
-  /* ─── Find posts ─────────────────────────────────────────────── */
-  function isValidPost(el) {
-    // Must have reasonable content and not be a tiny widget
-    const rect = el.getBoundingClientRect();
-    // During initial load, rect may be 0; allow those too
-    if (rect.width > 0 && rect.width < 100) return false;
-    if (rect.height > 0 && rect.height < 80) return false;
-    return true;
+  /* ── find action bar (Like / Comment / Share row) ───────────────── */
+  function findActionBar(postEl) {
+    // 1. Toolbar role (most reliable on current FB)
+    const tb = qs(postEl, 'div[role="toolbar"]');
+    if (tb) return tb;
+
+    // 2. Find by one of the known action buttons, then return its parent row
+    const actionSelectors = [
+      '[aria-label="Like"]',
+      '[aria-label="Thích"]',
+      '[aria-label="Comment"]',
+      '[aria-label="Bình luận"]',
+      '[aria-label="Share"]',
+      '[aria-label="Chia sẻ"]',
+    ];
+    for (const s of actionSelectors) {
+      const btn = qs(postEl, s);
+      if (btn) {
+        // Walk up 2–3 levels to find the flex row
+        let p = btn.parentElement;
+        for (let i = 0; i < 3 && p && p !== postEl; i++) {
+          if (p.children.length >= 2) return p;
+          p = p.parentElement;
+        }
+      }
+    }
+
+    // 3. Fallback: last child div of the article (usually the action area)
+    const divs = qsa(postEl, ':scope > div > div');
+    return divs[divs.length - 1] || null;
   }
 
-  function scanPosts() {
-    // Feed posts use role="article"; pick top-level ones (not nested inside another article)
-    const articles = qsa(document, 'div[role="article"]');
-    articles.forEach(el => {
-      // Skip if this article is nested inside another article already injected
-      const parentArticle = el.parentElement?.closest(`[${INJECTED_ATTR}]`);
-      if (parentArticle) return;
-      if (isValidPost(el)) injectButton(el);
+  /* ── inject into action bar ─────────────────────────────────────── */
+  function injectIntoPost(postEl) {
+    // Guard: already injected
+    if (postEl.hasAttribute(INJECTED)) return;
+    // Guard: too little content (ads, widgets)
+    if ((postEl.textContent?.trim().length || 0) < 30) return;
+
+    const postId  = getPostId(postEl);
+    const isSaved = savedIds.has(postId);
+    postEl.setAttribute(INJECTED, '1');
+    postEl.dataset[`${PFX}Id`] = postId;
+    if (isSaved) postEl.setAttribute(SAVED, '1');
+
+    const btn = makeBtn(isSaved);
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleSave(postEl, btn);
     });
 
-    // Marketplace listing cards
-    if (isMarketplace()) {
-      qsa(document, 'div[data-testid="marketplace_feed_item"], a[href*="/marketplace/item/"]').forEach(el => {
-        const target = el.tagName === 'A' ? (el.parentElement || el) : el;
-        if (!target.hasAttribute(INJECTED_ATTR) && isValidPost(target)) injectButton(target);
+    const bar = findActionBar(postEl);
+    if (bar) {
+      // Wrap to avoid inheriting flex styles from FB's toolbar
+      const wrap = document.createElement('div');
+      wrap.className = `${PFX}-wrap`;
+      wrap.appendChild(btn);
+      bar.appendChild(wrap);
+    } else {
+      // Absolute fallback: insert near the top of the article
+      const wrap = document.createElement('div');
+      wrap.className = `${PFX}-wrap ${PFX}-wrap--float`;
+      wrap.appendChild(btn);
+      postEl.insertBefore(wrap, postEl.firstChild);
+    }
+  }
+
+  /* ── scan all posts ─────────────────────────────────────────────── */
+  function scan() {
+    const articles = qsa(document, 'div[role="article"]');
+    articles.forEach(el => {
+      // Skip articles nested inside another already-injected article
+      if (el.closest(`[${INJECTED}]`) && !el.hasAttribute(INJECTED)) return;
+      injectIntoPost(el);
+    });
+
+    // Marketplace cards
+    if (/\/marketplace/.test(window.location.pathname)) {
+      qsa(document, 'div[data-testid="marketplace_feed_item"]').forEach(injectIntoPost);
+      qsa(document, 'a[href*="/marketplace/item/"]').forEach(a => {
+        const card = a.parentElement;
+        if (card && !card.hasAttribute(INJECTED)) injectIntoPost(card);
       });
     }
   }
 
-  /* ─── MutationObserver ───────────────────────────────────────── */
-  const debouncedScan = debounce(scanPosts, DEBOUNCE_MS);
+  /* ── MutationObserver ───────────────────────────────────────────── */
   new MutationObserver(muts => {
-    if (muts.some(m => m.addedNodes.length)) debouncedScan();
+    const added = muts.some(m =>
+      [...m.addedNodes].some(n => n.nodeType === 1 && !n.id?.startsWith(PFX))
+    );
+    if (added) debounceScan();
   }).observe(document.documentElement, { childList: true, subtree: true });
 
-  /* ─── SPA navigation ─────────────────────────────────────────── */
-  ['pushState', 'replaceState'].forEach(method => {
-    const orig = history[method].bind(history);
-    history[method] = function (...args) { orig(...args); setTimeout(scanPosts, 800); };
+  /* ── SPA nav ────────────────────────────────────────────────────── */
+  ['pushState','replaceState'].forEach(m => {
+    const orig = history[m].bind(history);
+    history[m] = (...a) => { orig(...a); setTimeout(scan, 900); };
   });
-  window.addEventListener('popstate', () => setTimeout(scanPosts, 800));
+  window.addEventListener('popstate', () => setTimeout(scan, 900));
 
-  /* ─── Context menu / background messages ────────────────────── */
-  chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+  /* ── messages from background ───────────────────────────────────── */
+  chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     switch (msg?.type) {
       case 'PING':
         reply({ ok: true });
         break;
 
       case 'EXTRACT_CURRENT_POST': {
-        // Context menu: find the most visible article on screen
-        const articles = qsa(document, `[${INJECTED_ATTR}]`);
+        // Find the most visible injected article on screen
         let best = null, bestArea = 0;
-        articles.forEach(el => {
+        qsa(document, `[${INJECTED}]`).forEach(el => {
           const r = el.getBoundingClientRect();
-          const visH = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
-          const visW = Math.min(r.right, window.innerWidth) - Math.max(r.left, 0);
-          const area = Math.max(0, visH) * Math.max(0, visW);
+          const h = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+          const w = Math.min(r.right,  window.innerWidth)  - Math.max(r.left, 0);
+          const area = Math.max(0, h) * Math.max(0, w);
           if (area > bestArea) { bestArea = area; best = el; }
         });
-        if (!best) {
-          // No injected article found, try any article
-          const any = qs(document, 'div[role="article"]');
-          if (any) best = any;
-        }
-        if (best) {
-          reply({ postData: buildPostData(best) });
-        } else {
-          // Fall back to page-level extraction
-          reply({ postData: { rawText: msg.selectedText || document.body.innerText.slice(0, 2000), images: [], postUrl: window.location.href, savedAt: new Date().toISOString(), pageUrl: window.location.href } });
-        }
+        if (!best) best = qs(document, 'div[role="article"]');
+        reply({ postData: best ? buildPostData(best) : {
+          rawText: msg.selectedText || '',
+          images: [],
+          postUrl: window.location.href,
+          savedAt: new Date().toISOString(),
+          pageUrl: window.location.href,
+        }});
         break;
       }
 
-      case 'POST_SAVED': {
+      case 'POST_SAVED':
         if (msg.success && msg.product?.id) {
           const el = document.querySelector(`[data-${PFX}-id="${msg.product.id}"]`);
           if (el) markSaved(el);
-          toast(msg.aiAnalyzed ? 'Đã lưu & phân tích AI ✓' : 'Đã lưu đơn hàng ✓', 'success');
+          showToast('Đã lưu đơn hàng ✓', 'success');
         }
         break;
-      }
 
       case 'REFRESH_SAVED_IDS':
         loadSavedIds();
@@ -316,22 +332,15 @@
         break;
 
       case 'GET_PAGE_INFO':
-        reply({ url: window.location.href, isMarketplace: isMarketplace(), posts: document.querySelectorAll(`[${INJECTED_ATTR}]`).length });
+        reply({ url: window.location.href, posts: document.querySelectorAll(`[${INJECTED}]`).length });
         break;
-
-      default: break;
     }
     return true;
   });
 
-  /* ─── Init ───────────────────────────────────────────────────── */
+  /* ── bootstrap ──────────────────────────────────────────────────── */
   loadSavedIds();
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scanPosts);
-  } else {
-    scanPosts();
-    // Also retry after FB finishes rendering
-    setTimeout(scanPosts, 1500);
-    setTimeout(scanPosts, 3000);
-  }
+  scan();
+  setTimeout(scan, 1500);
+  setTimeout(scan, 4000);
 })();
